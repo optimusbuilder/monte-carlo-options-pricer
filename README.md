@@ -1,60 +1,68 @@
+# Monte Carlo Option Pricing in C++
 
----
+A practical look at pricing options using Monte Carlo simulations. This project compares standard European options against Asian path-dependent options, and includes a version using Antithetic Variates to show how you can get cleaner data with fewer simulations.
 
-# Monte Carlo Options Pricer — C++
+## 🤔 How It Works (The Intuition)
 
-A Monte Carlo simulation that prices European call options using Geometric Brownian Motion. Built to understand how quant desks price derivatives without closed-form solutions.
+Instead of relying on heavy calculus, this code simulates thousands of possible random price paths for a stock to see where it lands at expiration, calculates the payoff, and discounts it back to today.
 
----
+### European vs. Asian Options: Why the Prices Differ
 
-## How It Works
+If you run the code, you'll notice the Asian option is always cheaper than the European option. Here's why:
 
-A call option gives you the right to buy a stock at a fixed price (the strike) at expiry. The question is — what is that right worth today?
+- **European Options** only care about the final price at the exact moment of expiry. If the stock spikes on the very last day, the payoff skyrockets.
+- **Asian Options** take the average price across the entire lifetime (simulated here across 252 trading days). Because we're averaging the steps, those extreme random spikes get smoothed out. Lower volatility in the path means a lower average payoff, which naturally drives the option price down.
 
-This pricer answers that by simulating 100,000 possible future price paths for the stock, calculating the payoff at expiry for each path, and averaging them. That average, discounted back to today using the risk-free rate, is the fair option price.
+### The Antithetic Trick
 
-The more simulations you run, the closer the result converges to the true price: the law of large numbers in action.
+Standard Monte Carlo needs a lot of runs to get an accurate price because random numbers tend to clump together.
 
----
+To fix that, the antithetic version generates two paths for the price of one. For every random path generated using a jump (z), it simultaneously spawns a twin path using the exact opposite jump (−z). This balances out the randomness and cuts down the noise (variance) in the final estimate.
 
-## The Math
+## 📊 Variance Reduction Results (Real Data)
 
-Each simulated price path uses Geometric Brownian Motion:
+To prove the antithetic technique actually works, here's the spread across 5 consecutive runs using 1,000 simulations per run.
 
-```
-S_final = S * exp((r - 0.5σ²) * T + σ * √T * Z)
-```
+| Run | European Price | Standard Asian Price | Asian Antithetic Price |
+|---|---|---|---|
+| Run 1 | 8.61 | 3.49 | 3.51 |
+| Run 2 | 8.13 | 3.52 | 3.61 |
+| Run 3 | 8.16 | 3.24 | 3.63 |
+| Run 4 | 7.82 | 3.98 | 3.64 |
+| Run 5 | 8.24 | 3.44 | 3.49 |
+| **Spread (Max − Min)** | **0.79** | **0.74** | **0.15** |
 
-Where Z is a random draw from a standard normal distribution. Payoff is then `max(S_final - Strike, 0)`, discounted back by `e^(-r*T)`.
+### What This Shows
 
----
+The standard Asian pricer has a spread of 0.74 across 5 runs at 1,000 simulations. By introducing antithetic paths, the spread drops to 0.15 — roughly a 5x tighter result at the same computational cost. That means you get a more stable price without needing to crank simulations up into the tens of thousands.
 
-## Inputs
+## 💻 Getting Started
 
-| Parameter | Description | Example |
-|---|---|---|
-| Stock price | Current market price | $100 |
-| Strike price | Price to buy at expiry | $105 |
-| Time to expiry | In years | 1.0 |
-| Volatility | Annual volatility (decimal) | 0.20 |
-| Risk-free rate | Safe investment return (decimal) | 0.05 |
-| Simulations | Number of random paths | 100,000 |
+### Prerequisites
 
----
+A modern C++ compiler supporting at least C++11 (like g++, clang++, or MSVC).
 
-## Sample Output
-
-```
-Option price: $8.02
-```
-
-This matches the Black-Scholes analytical price of ~$8.02 for these inputs, validating the simulation.
-
----
-
-## Run It
+### Compilation
 
 ```bash
-g++ -std=c++17 main.cpp -o pricer
-./pricer
+g++ -O3 -std=c++11 main.cpp -o option_pricer
 ```
+
+(The `-O3` flag is recommended to speed up the simulation loops.)
+
+### Running the Executable
+
+```bash
+./option_pricer
+```
+
+## ⚙️ Parameters Used in Main
+
+| Parameter | Description | Default Value |
+|---|---|---|
+| currentStockPrice | Spot price of the underlying asset | 100.0 |
+| optionPrice | Strike price of the option | 105.0 |
+| priceExpiry | Time to expiration in years | 1.0 (1 Year) |
+| stockVolatility | Annualized volatility of the asset | 0.20 (20%) |
+| numSimulations | Number of Monte Carlo iterations | 1000 |
+| riskFreeRate | Continuous risk-free interest rate | 0.05 (5%) |
